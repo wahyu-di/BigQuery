@@ -7,7 +7,8 @@ fd as (
   from
   (
     select
-     timestamp_add(timestamp(date(current_timestamp(), 'Asia/Jakarta')), interval -79 hour) as filter1
+     --timestamp_add(timestamp(date(current_timestamp(), 'Asia/Jakarta')), interval -79 hour) as filter1
+     timestamp('2020-08-09 17:00:00') as filter1
   )
 )
 , oc as (
@@ -66,7 +67,6 @@ fd as (
         when event_type in ('D') then 'Attraction'
         when event_type in ('E') then 'Activity'
         when event_type not in ('D','E') then 'Event'
-		when event_name like ('Sewa Mobil%') then 'Car' 
       end as product_category
   from
     `datamart-finance.staging.v_order__event_connect_ms`
