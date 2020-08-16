@@ -615,7 +615,7 @@ from
         when oecm.event_name like ('Airport Transfer%') then 'Car'
         when oecm.event_name like ('Tix-Spot Airport Lounge%') then 'Others'
         when lower(oecm.event_name) like ('%railink%') then 'Train'
-		when lower(oecm.event_name) like ('%Sewa Mobil%') then 'Car' --TTD car 
+		    when lower(oecm.event_name) like ('%Sewa Mobil%') then 'Car' --TTD car 
         when oecm.event_type in ('D') then 'Attraction'
         when oecm.event_type in ('E') then 'Activity'
         when oecm.event_type not in ('D','E') then 'Event'
