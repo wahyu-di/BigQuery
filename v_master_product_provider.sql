@@ -45,7 +45,11 @@ fd as (
     detail_id as detail_event_id
     , string_agg(distinct business_id) as product_provider_id
     , string_agg(distinct event_name) as product_provider_name
-    , string_agg(distinct event_type) as event_type
+    , case
+		    when lower(event_name) like ('%Sewa Mobil%') then 'Car' --TTD car 
+        when event_type then event_type
+      end as event_type
+    --string_agg(distinct event_type) as event_type
     , string_agg(distinct event_category) as event_category
   from
     `datamart-finance.staging.v_detail__event_connect_ms` 
