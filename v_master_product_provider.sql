@@ -45,11 +45,7 @@ fd as (
     detail_id as detail_event_id
     , string_agg(distinct business_id) as product_provider_id
     , string_agg(distinct event_name) as product_provider_name
-    , case
-		    when lower(event_name) like ('%Sewa Mobil%') then 'Car' --TTD car 
-        when event_type then event_type
-      end as event_type
-    --string_agg(distinct event_type) as event_type
+    , string_agg(distinct event_type) as event_type
     , string_agg(distinct event_category) as event_category
   from
     `datamart-finance.staging.v_detail__event_connect_ms` 
@@ -68,6 +64,7 @@ fd as (
       end as product_provider_name
     , case
         when is_tiketflexi = 1 and event_category = 'HOTEL' then 'Hotel'
+        when lower(product_provider_name) like ('%sewa mobil%') then 'Car' --TTD car 
         when event_type in ('D') then 'Attraction'
         when event_type in ('E') then 'Activity'
         when event_type not in ('D','E') then 'Event'
@@ -229,4 +226,4 @@ from
   fact 
   left join ms on fact.product_provider_id = ms.product_provider_id 
 where 
-  ms.product_provider_id is null
+  ms.product_provider_id ='5f06810c873c1219e09be295' --is null
