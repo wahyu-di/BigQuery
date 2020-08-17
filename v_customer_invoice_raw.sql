@@ -615,7 +615,7 @@ from
         when oecm.event_name like ('Airport Transfer%') then 'Car'
         when oecm.event_name like ('Tix-Spot Airport Lounge%') then 'Others'
         when lower(oecm.event_name) like ('%railink%') then 'Train'
-		    when lower(oecm.event_name) like ('%Sewa Mobil%') then 'Car' --TTD car 
+		    when lower(oecm.event_name) like ('%sewa mobil%') then 'Car' --TTD car 
         when oecm.event_type in ('D') then 'Attraction'
         when oecm.event_type in ('E') then 'Activity'
         when oecm.event_type not in ('D','E') then 'Event'
@@ -634,7 +634,7 @@ from
     , case
         when oecm.is_tiketflexi = 1 and event_category = 'HOTEL' then 'Hotel_Voucher'
         when oecm.event_name like ('Airport Transfer%') then 'Shuttle'
-		when oecm.event_name like ('Sewa Mobil%') then 'Shuttle' --TTD car 
+		    when oecm.event_name like ('Sewa Mobil%') then 'Shuttle' --TTD car 
         when oecm.event_name like ('Tix-Spot Airport Lounge%') then 'Lounge'
         else 'Ticket'
       end as revenue_category_event
