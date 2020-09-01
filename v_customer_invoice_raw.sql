@@ -8,7 +8,7 @@ fd as (
   from
   (
     select
-       timestamp_add(timestamp(date(current_timestamp(),'Asia/Jakarta')), interval -79 hour) as filter1
+      timestamp('2020-08-26 17:00:00') as filter1 -- timestamp_add(timestamp(date(current_timestamp(),'Asia/Jakarta')), interval -79 hour) as filter1
   )
 )
 , ca as (
@@ -615,7 +615,6 @@ from
         when oecm.event_name like ('Airport Transfer%') then 'Car'
         when oecm.event_name like ('Tix-Spot Airport Lounge%') then 'Others'
         when lower(oecm.event_name) like ('%railink%') then 'Train'
-		    when lower(oecm.event_name) like ('%sewa mobil%') then 'Car' --TTD car 
         when oecm.event_type in ('D') then 'Attraction'
         when oecm.event_type in ('E') then 'Activity'
         when oecm.event_type not in ('D','E') then 'Event'
@@ -634,7 +633,6 @@ from
     , case
         when oecm.is_tiketflexi = 1 and event_category = 'HOTEL' then 'Hotel_Voucher'
         when oecm.event_name like ('Airport Transfer%') then 'Shuttle'
-		    when oecm.event_name like ('Sewa Mobil%') then 'Shuttle' --TTD car 
         when oecm.event_name like ('Tix-Spot Airport Lounge%') then 'Lounge'
         else 'Ticket'
       end as revenue_category_event
@@ -1025,6 +1023,15 @@ from
     hbao
   group by 
     1
+)
+, oar as (
+select 
+  distinct(new_order_id) as order_id
+  , order_id as old_id_rebooking
+  , total_customer_price-new_total_customer_price as diff_amount_rebooking
+  --, 'Rebooking_Sales' as revenue_category_rebooking
+from `datamart-finance.staging.v_order__automatic_rebooking` 
+where rebook_status='SUCCESS'
 )
 , fact_hotel as (
   select
@@ -1475,6 +1482,8 @@ from
         fe.ticket_number_event
         , ff.ticket_number_flight
       ) as ticket_number
+    , oar.old_id_rebooking
+    , oar.diff_amount_rebooking
     , add_ons_hotel_detail_json
     , add_ons_hotel_detail_array as add_ons_hotel_detail_array
     , coalesce(total_add_ons_hotel_net_price_amount,0) as total_add_ons_hotel_net_price_amount
@@ -1573,6 +1582,10 @@ from
         else 0
       end as is_have_add_ons_hotel_flag
     , coalesce(is_has_halodoc_flag, 0) as is_has_halodoc_flag
+    , case
+        when oar.old_id_rebooking is null then '0' -- edit for wahyu @27 Agustus 2020
+        else '1' 
+        end as is_rebooking_flag
   from
     oc
     inner join ocd using (order_id)
@@ -1605,6 +1618,7 @@ from
     left join wmpc on wmpc.payment_type_bank = replace(coalesce(fpm2.payment_type_bank, fpm.payment_type_bank),' ','_') and wmpc.installment = oc.cc_installment and date(oc.payment_timestamp) between wmpc.start_date and coalesce(wmpc.end_date,current_date())
     left join master_event_supplier mes on (coalesce(fe.supplier_event,fat.old_supplier_id) = mes.old_supplier_id and ocd.order_name = mes.event_name)
     left join master_event_product_provider mepp on (coalesce(fe.product_provider_event,fat.old_product_provider_id) = mepp.old_product_provider_id and ocd.order_name = mepp.event_name)
+    left join oar using (order_id)
 
 )
 , fact as (
@@ -1657,11 +1671,12 @@ from
         else 0
       end as is_supplier_flight_not_found_flag
     , case 
-        when sum(cogs + commission + upselling + subsidy + payment_charge + promocode_value + giftvoucher_value + refund_deposit_value + tiketpoint_value + insurance_value + cancel_insurance_value + ifnull(vat_out,0) + ifnull(baggage_fee,0) + rebooking_sales_hotel + total_add_ons_hotel_sell_price_amount + halodoc_sell_price_amount + convenience_fee_amount) over(partition by order_id) > 0 
-        and sum(cogs + commission + upselling + subsidy + payment_charge + promocode_value + giftvoucher_value + refund_deposit_value + tiketpoint_value + insurance_value + cancel_insurance_value + ifnull(vat_out,0) + ifnull(baggage_fee,0) + rebooking_sales_hotel + total_add_ons_hotel_sell_price_amount + halodoc_sell_price_amount + convenience_fee_amount) over(partition by order_id) <> payment_amount
+        when sum(cogs + commission + upselling + subsidy + payment_charge + promocode_value + giftvoucher_value + refund_deposit_value + tiketpoint_value + insurance_value + cancel_insurance_value + ifnull(vat_out,0) + ifnull(baggage_fee,0) + rebooking_sales_hotel + total_add_ons_hotel_sell_price_amount + halodoc_sell_price_amount + convenience_fee_amount + diff_amount_rebooking) over(partition by order_id) > 0 
+        and sum(cogs + commission + upselling + subsidy + payment_charge + promocode_value + giftvoucher_value + refund_deposit_value + tiketpoint_value + insurance_value + cancel_insurance_value + ifnull(vat_out,0) + ifnull(baggage_fee,0) + rebooking_sales_hotel + total_add_ons_hotel_sell_price_amount + halodoc_sell_price_amount + convenience_fee_amount + diff_amount_rebooking) over(partition by order_id) <> payment_amount
           then 0
         else 1
       end as is_amount_valid_flag
+      
   from
     combine c
     left join master_supplier ms on ms.supplier_id = c.supplier and c.payment_date >= ms.start_date and c.payment_date < ms.end_date
@@ -1773,8 +1788,8 @@ from
   and (tr.giftcard_voucher_user_email_reference_id = fact.giftcard_voucher_user_email_reference_id or (tr.giftcard_voucher_user_email_reference_id is null and fact.giftcard_voucher_user_email_reference_id is null))
   and (tr.giftcard_voucher_purpose = fact.giftcard_voucher_purpose or (tr.giftcard_voucher_purpose is null and fact.giftcard_voucher_purpose is null))
   and (tr.memo_giftvoucher = fact.memo_giftvoucher or (tr.memo_giftvoucher is null and fact.memo_giftvoucher is null))
-where
-  tr.order_id is null
+ where
+   tr.order_id is null
 )
 
-select * from append
+select * from append -- where order_id IN(104966814,104983210,104960676)
