@@ -543,8 +543,9 @@ select
 from 
   fact 
 where  
-  category = 'hotel' 
+  order_id in( 105479533,105479604, 105481091 ) 
+  /*category = 'hotel' 
     or 
   (category = 'tixhotel' and itin_number is not null)
-  and 
-  order_id in( 105443362 ) --104888234,104892368, 104897536, 104901842, 104888250)
+  and */
+  
