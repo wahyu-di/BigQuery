@@ -17,10 +17,11 @@ WITH
     total_customer_price,
     cs_id
   FROM
-    `prod-datarangers.galaxy_stg.order__cart`
+    `datamart-finance.staging.v_order__cart` 
   WHERE
     payment_timestamp >= '2017-12-31 17:00:00'
---     AND payment_timestamp < '2019-03-08 17:00:00'
+    --payment_timestamp >= '2020-09-20 17:00:00'
+    --AND payment_timestamp < '2020-09-30 17:00:00'
     AND payment_status = 'paid' ),
   ocd AS (
   SELECT
@@ -33,7 +34,7 @@ WITH
     selling_price,
     order_detail_status
   FROM
-    `prod-datarangers.galaxy_stg.order__cart_detail`
+    `datamart-finance.staging.v_order__cart_detail` 
   WHERE
     order_detail_status IN ('active',
       'refund',
@@ -50,7 +51,7 @@ WITH
     comission,
     order_detail_status
   FROM
-    `prod-datarangers.galaxy_stg.order__cart_detail`
+    `datamart-finance.staging.v_order__cart_detail` 
   WHERE
     order_type IN ('hotel',
       'tixhotel')
@@ -64,7 +65,7 @@ WITH
   SELECT
     order_id
   FROM
-    `prod-datarangers.galaxy_stg.order__payment`
+    `datamart-finance.staging.v_order__payment` 
   WHERE
     payment_flag = 1
     AND payment_id = 1
@@ -84,7 +85,7 @@ WITH
     net_rate_currency,
     order_detail_status
   FROM
-    `prod-datarangers.galaxy_stg.order__cart_hotel`
+    `datamart-finance.staging.v_order__cart_hotel` 
   WHERE
     last_update >= '2017-12-29 17:00:00'
     AND order_detail_status IN ('active',
@@ -106,7 +107,7 @@ WITH
     countryName,
     hotel_itinerarynumber
   FROM
-    `prod-datarangers.galaxy_stg.order__tixhotel`
+    `datamart-finance.staging.v_order__tixhotel` 
   WHERE
     created_timestamp >= '2017-12-29 17:00:00'),
  hb_new AS (
@@ -117,12 +118,12 @@ WITH
     hotel_id as master_id,
     booking_status
   FROM
-    `prod-datarangers.galaxy_stg.hotel_bookings`
+    `datamart-finance.staging.v_hotel_bookings` 
   WHERE
     updated_date >= '2017-12-29 17:00:00'
     AND booking_status IN ('issued',
       'refund')),
-  hb_old AS (
+  /*hb_old AS (
   SELECT
     itinerary_id,
     commission,
@@ -135,11 +136,11 @@ WITH
     AND booking_status IN ('issued',
       'refund')
     AND itinerary_id not in (select itinerary_id from hb_new)
-  ),
+  ),*/
   hb as (
     select * from hb_new
-    union distinct
-    select * from hb_old
+    --union distinct
+    --select * from hb_old
   ),
   hbd_new AS (
   SELECT
@@ -168,7 +169,7 @@ WITH
       end as total_customer_price,
       row_number() over(partition by itinerary_id order by checkin_date asc) as rn
     FROM
-      `prod-datarangers.galaxy_stg.hotel_booking_details`
+      `datamart-finance.staging.v_hotel_booking_details` 
     WHERE
       checkin_date >= '2017-12-29 17:00:00'
     order by itinerary_id, checkin_date asc
@@ -177,7 +178,7 @@ WITH
     itinerary_id,
     net_rate_currency 
   ),
-  hbd_old AS (
+  /*hbd_old AS (
   SELECT
     itinerary_id,
     net_rate_currency,
@@ -198,7 +199,8 @@ WITH
       total_customer_price - (sub_price_idr * rooms) as total_customer_price,
       row_number() over(partition by itinerary_id order by checkin_date asc) as rn
     FROM
-      `prod-datarangers.galaxy_stg.hotel__booking_detail`
+      --`prod-datarangers.galaxy_stg.hotel__booking_detail`
+      `datamart-finance.staging.v_hotel_
     WHERE
       booking_detail_status='active'
       AND checkin_date >= '2017-12-29 17:00:00'
@@ -208,11 +210,11 @@ WITH
     itinerary_id,
     room_id,
     net_rate_currency 
-  ),
+  ),*/
   hbd as (
     select * from hbd_new
-    union distinct
-    select * from hbd_old
+    --union distinct
+    --select * from hbd_old
   ),
   bp AS (
   SELECT
@@ -220,52 +222,65 @@ WITH
     business_name,
     business_province
   FROM
-    `prod-datarangers.galaxy_stg.business__profile` ),
+    `datamart-finance.staging.v_business__profile` ),
   hr AS (
   SELECT
     room_id,
     ext_source,
     master_id
   FROM
-    `prod-datarangers.galaxy_stg.hotel__room`),
+    `datamart-finance.staging.v_hotel__room` ),
   ap AS (
   SELECT
     province_id,
     province_name,
     province_country_id
   FROM
-    `prod-datarangers.galaxy_stg.address__province` ),
+    `datamart-finance.staging.v_address__province` ),
   ac AS (
   SELECT
     country_id,
     country_name
   FROM
-    `prod-datarangers.galaxy_stg.address__country`),
+    `datamart-finance.staging.v_address__country` ),
   bpay as (
     select
       order_detail_id
       , upper(payment_status) as payment_status
     from
-      `prod-datarangers.galaxy_stg.business__payment`
+      `datamart-finance.staging.v_business__payment` 
   )
 , hps as (
   select
     itinerary_id
     , string_agg(distinct payment_status) as payment_status
   from
-    `prod-datarangers.galaxy_stg.hotel_payments` 
+    `datamart-finance.staging.v_hotel_payments` 
   where 
     created_date >= '2017-12-30 17:00:00'
     and payment_status = 'PAID'
   group by
     itinerary_id
 )
+,   -- @wahyu 17 September 2020
+oar as ( 
+select 
+  distinct(new_order_id) as order_id
+  , order_id as old_order_id
+  , total_customer_price
+  , new_total_customer_price
+from `datamart-finance.staging.v_order__automatic_rebooking` 
+where rebook_status='SUCCESS'
+)
 , fact as (
   SELECT
   ocdh.order_id,
   ocdh.order_detail_id,
-  Datetime(oc.payment_timestamp,
-    'Asia/Jakarta') AS payment_timestamp,
+  oar.old_order_id,
+  oar.new_total_customer_price-oar.total_customer_price as difference,
+  oar.total_customer_price,
+  Datetime ( oc.payment_timestamp, 
+  'Asia/Jakarta') AS payment_timestamp,
   ocdh.order_type AS category,
   oc.customer_currency AS currency,
   STRING_AGG(distinct hb.booking_status) as booking_status,
@@ -465,13 +480,16 @@ on bpay.order_detail_id = ocdh.order_detail_id
 LEFT JOIN
   hps
 on safe_cast(hps.itinerary_id as string) = ott.hotel_itinerarynumber 
-
+left join oar on  oar.order_id=oc.order_id
 GROUP BY
   1,
   2,
   3,
   4,
-  5
+  5,
+  6,
+  7,
+  8
 )
 
 select 
@@ -509,9 +527,24 @@ select
   SAFE_CAST(total_net_rate as float64) as total_net_rate,
   SAFE_CAST(total_sell_rate as float64) as total_sell_rate,
   tiket_payment_status
+  , case 
+      when difference is null then 'No'
+      else "Yes"
+      end as is_rebooking_flag 
+  , old_order_id
+  , difference as difference_amount
+  , case
+      when difference > 0 then 'Addittional Price'
+      when difference < 0 then 'Cashback'
+      when difference = 0 then 'No Difference'
+      else null
+    end as rebooking_status
+  , total_customer_price as old_total_customer_price
 from 
   fact 
-where 
+where  
   category = 'hotel' 
     or 
   (category = 'tixhotel' and itin_number is not null)
+  and 
+  order_id in( 105443362 ) --104888234,104892368, 104897536, 104901842, 104888250)
