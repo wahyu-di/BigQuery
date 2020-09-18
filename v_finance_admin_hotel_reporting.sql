@@ -19,8 +19,8 @@ WITH
   FROM
     `datamart-finance.staging.v_order__cart` 
   WHERE
-    payment_timestamp >= '2017-12-31 17:00:00'
-    --payment_timestamp >= '2020-09-20 17:00:00'
+    --payment_timestamp >= '2017-12-31 17:00:00'
+    payment_timestamp >= '2020-09-10 17:00:00'
     --AND payment_timestamp < '2020-09-30 17:00:00'
     AND payment_status = 'paid' ),
   ocd AS (
@@ -39,8 +39,8 @@ WITH
     order_detail_status IN ('active',
       'refund',
       'refunded','hide_by_cust')
-    AND created_timestamp >= '2017-12-29 17:00:00'
---     AND created_timestamp < '2019-03-08 17:00:00'
+    --AND created_timestamp >= '2017-12-29 17:00:00'
+     AND created_timestamp >= '2020-09-10 17:00:00'
   ),
   ocdh AS (
   SELECT
@@ -58,8 +58,8 @@ WITH
     AND order_detail_status IN ('active',
       'refund',
       'refunded','hide_by_cust')
-    AND created_timestamp >= '2017-12-29 17:00:00'
---     AND created_timestamp < '2019-03-08 17:00:00'
+    --AND created_timestamp >= '2017-12-29 17:00:00'
+    AND created_timestamp >= '2020-09-10 17:00:00'
   ),
   op AS(
   SELECT
@@ -69,8 +69,8 @@ WITH
   WHERE
     payment_flag = 1
     AND payment_id = 1
-    AND payment_timestamp >= '2017-12-29 17:00:00'
---     AND payment_timestamp < '2019-03-08 17:00:00'
+    --AND payment_timestamp >= '2017-12-29 17:00:00'
+    AND payment_timestamp >= '2020-09-10 17:00:00'
   ),
   och AS (
   SELECT
@@ -87,7 +87,8 @@ WITH
   FROM
     `datamart-finance.staging.v_order__cart_hotel` 
   WHERE
-    last_update >= '2017-12-29 17:00:00'
+    --last_update >= '2017-12-29 17:00:00'
+    last_update >= '2020-09-10 17:00:00'
     AND order_detail_status IN ('active',
       'refund',
       'refunded','hide_by_cust')),
@@ -532,14 +533,15 @@ select
       else "Yes"
       end as is_rebooking_flag 
   , old_order_id
-  , difference as difference_amount
+  , safe_cast( difference as float64 ) as difference_amount
+  --, difference as difference_amount
   , case
       when difference > 0 then 'Addittional Price'
       when difference < 0 then 'Cashback'
       when difference = 0 then 'No Difference'
       else null
     end as rebooking_status
-  , total_customer_price as old_total_customer_price
+  , safe_cast( total_customer_price  as float64 ) as old_total_customer_price
 from 
   fact 
 where  
